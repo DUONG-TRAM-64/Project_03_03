@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password is required to delete account' }, { status: 400 });
     }
 
-    const user = findById<UserDoc>('users', payload.userId);
+    const user = await findById<UserDoc>('users', payload.userId);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
@@ -32,15 +32,15 @@ export async function POST(req: NextRequest) {
     // Delete all user data
     const collections = ['sessions', 'subjects', 'goals', 'favorites'];
     for (const collection of collections) {
-      const items = findAll<{ _id: string; userId: string }>(collection)
-        .filter((item) => item.userId === payload.userId);
+      const allItems = await findAll<{ _id: string; userId: string }>(collection);
+      const items = allItems.filter((item) => item.userId === payload.userId);
       for (const item of items) {
-        deleteOne(collection, item._id);
+        await deleteOne(collection, item._id);
       }
     }
 
     // Delete user
-    deleteOne('users', payload.userId);
+    await deleteOne('users', payload.userId);
 
     const response = NextResponse.json({ success: true, message: 'Account deleted' });
     response.cookies.set('token', '', { maxAge: 0 });

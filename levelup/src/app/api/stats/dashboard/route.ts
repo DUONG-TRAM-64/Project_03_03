@@ -19,10 +19,10 @@ export async function GET(req: NextRequest) {
     const payload = getUserFromRequest(req);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const user = findById<UserDoc>('users', payload.userId);
+    const user = await findById<UserDoc>('users', payload.userId);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    const allSessions = findAll<SessionDoc>('sessions')
+    const allSessions = (await findAll<SessionDoc>('sessions'))
       .filter((s) => s.userId === payload.userId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     const currentLevelXP = level > 0 ? xpForLevel(level - 1) : 0;
     const levelProgress = nextLevelXP > currentLevelXP ? ((totalXP - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100 : 0;
 
-    updateOne<UserDoc>('users', payload.userId, { xp: totalXP, level } as any);
+    await updateOne<UserDoc>('users', payload.userId, { xp: totalXP, level } as any);
 
     const weeklyData = [];
     for (let i = 6; i >= 0; i--) {
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       monthlyData.push({ date: format(day, 'dd/MM'), hours: Number((dayMinutes / 60).toFixed(2)) });
     }
 
-    const subjects = findAll<SubjectDoc>('subjects').filter((s) => s.userId === payload.userId && !s.archived);
+    const subjects = (await findAll<SubjectDoc>('subjects')).filter((s) => s.userId === payload.userId && !s.archived);
     const subjectProgress = subjects.map((subject) => {
       const subSessions = allSessions.filter((s) => s.subjectId === subject._id);
       const subMinutes = subSessions.reduce((sum, s) => sum + s.duration, 0);
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       return { id: subject._id, name: subject.name, icon: subject.icon, color: subject.color, targetHours: subject.targetHours, actualHours: subHours, progress: Number(progress.toFixed(1)), lastStudied: lastSession };
     });
 
-    const goals = findAll<GoalDoc>('goals').filter((g) => g.userId === payload.userId);
+    const goals = (await findAll<GoalDoc>('goals')).filter((g) => g.userId === payload.userId);
     const completedGoals = goals.filter((g) => g.completed).length;
     const badges = getBadges(totalHours);
 
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
     allSessions.forEach((s) => { if (s.mood && moodCounts[s.mood] !== undefined) moodCounts[s.mood]++; });
 
     // Favorites summary
-    const allFavorites = findAll<FavoriteDoc>('favorites').filter((f) => f.userId === payload.userId);
+    const allFavorites = (await findAll<FavoriteDoc>('favorites')).filter((f) => f.userId === payload.userId);
     const mostVisited = allFavorites.length > 0
       ? [...allFavorites].sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))[0]
       : null;

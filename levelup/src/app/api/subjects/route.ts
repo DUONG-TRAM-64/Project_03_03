@@ -27,13 +27,13 @@ export async function GET(req: NextRequest) {
 
     const showArchived = req.nextUrl.searchParams.get('archived') === 'true';
 
-    let subjects = findAll<SubjectDoc>('subjects').filter(
+    let subjects = (await findAll<SubjectDoc>('subjects')).filter(
       (s) => s.userId === payload.userId && (showArchived || !s.archived)
     );
 
     subjects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const allSessions = findAll<SessionDoc>('sessions').filter((s) => s.userId === payload.userId);
+    const allSessions = (await findAll<SessionDoc>('sessions')).filter((s) => s.userId === payload.userId);
 
     const subjectsWithHours = subjects.map((subject) => {
       const totalMinutes = allSessions
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const { name, icon, color, targetHours } = await req.json();
     if (!name) return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
 
-    const subject = insertOne<SubjectDoc>('subjects', {
+    const subject = await insertOne<SubjectDoc>('subjects', {
       _id: generateId(),
       userId: payload.userId,
       name,
@@ -88,7 +88,7 @@ export async function PUT(req: NextRequest) {
     const { id, name, icon, color, targetHours, archived } = await req.json();
     if (!id) return NextResponse.json({ error: 'Subject ID is required' }, { status: 400 });
 
-    const existing = findById<SubjectDoc>('subjects', id);
+    const existing = await findById<SubjectDoc>('subjects', id);
     if (!existing || existing.userId !== payload.userId) {
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
@@ -100,7 +100,7 @@ export async function PUT(req: NextRequest) {
     if (targetHours !== undefined) updates.targetHours = targetHours;
     if (archived !== undefined) updates.archived = archived;
 
-    const subject = updateOne<SubjectDoc>('subjects', id, updates);
+    const subject = await updateOne<SubjectDoc>('subjects', id, updates);
     return NextResponse.json({ subject });
   } catch (error: any) {
     console.error('Update subject error:', error);
@@ -114,13 +114,13 @@ export async function DELETE(req: NextRequest) {
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await req.json();
-    const existing = findById<SubjectDoc>('subjects', id);
+    const existing = await findById<SubjectDoc>('subjects', id);
     if (!existing || existing.userId !== payload.userId) {
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
 
-    deleteOne('subjects', id);
-    deleteMany<SessionDoc>('sessions', { subjectId: id, userId: payload.userId } as any);
+    await deleteOne('subjects', id);
+    await deleteMany<SessionDoc>('sessions', { subjectId: id, userId: payload.userId } as any);
 
     return NextResponse.json({ message: 'Subject deleted' });
   } catch (error: any) {

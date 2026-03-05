@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    const user = findOne<UserDoc>('users', { email: email.toLowerCase() });
+    const user = await findOne<UserDoc>('users', { email: email.toLowerCase() });
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }

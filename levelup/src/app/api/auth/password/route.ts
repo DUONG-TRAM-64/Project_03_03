@@ -28,7 +28,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'New password must be at least 6 characters' }, { status: 400 });
     }
 
-    const user = findById<UserDoc>('users', payload.userId);
+    const user = await findById<UserDoc>('users', payload.userId);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
-    updateOne<UserDoc>('users', payload.userId, { passwordHash: newHash } as any);
+    await updateOne<UserDoc>('users', payload.userId, { passwordHash: newHash } as any);
 
     return NextResponse.json({ success: true, message: 'Password updated successfully' });
   } catch (error: any) {

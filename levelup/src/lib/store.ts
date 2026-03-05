@@ -1,113 +1,59 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function getFilePath(collection: string): string {
-  ensureDataDir();
-  return path.join(DATA_DIR, `${collection}.json`);
-}
-
-function readCollection<T>(collection: string): T[] {
-  const filePath = getFilePath(collection);
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, '[]', 'utf-8');
-    return [];
-  }
-  try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function writeCollection<T>(collection: string, data: T[]): void {
-  const filePath = getFilePath(collection);
-  ensureDataDir();
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-}
+import { connectDB } from './db';
 
 export function generateId(): string {
   return crypto.randomBytes(12).toString('hex');
 }
 
-export function findAll<T>(collection: string, filter?: Partial<T>): T[] {
-  let items = readCollection<T>(collection);
-  if (filter) {
-    items = items.filter((item) => {
-      return Object.entries(filter).every(([key, value]) => {
-        return (item as any)[key] === value;
-      });
-    });
-  }
-  return items;
+export async function findAll<T>(collection: string, filter?: Partial<T>): Promise<T[]> {
+  const db = await connectDB();
+  const query = filter ? (filter as Record<string, unknown>) : {};
+  const items = await db.collection(collection).find(query).toArray();
+  return items as unknown as T[];
 }
 
-export function findById<T extends { _id: string }>(collection: string, id: string): T | null {
-  const items = readCollection<T>(collection);
-  return items.find((item) => item._id === id) || null;
+export async function findById<T extends { _id: string }>(collection: string, id: string): Promise<T | null> {
+  const db = await connectDB();
+  const item = await db.collection(collection).findOne({ _id: id as any });
+  return item as unknown as T | null;
 }
 
-export function findOne<T>(collection: string, filter: Partial<T>): T | null {
-  const items = readCollection<T>(collection);
-  return items.find((item) => {
-    return Object.entries(filter).every(([key, value]) => {
-      return (item as any)[key] === value;
-    });
-  }) || null;
+export async function findOne<T>(collection: string, filter: Partial<T>): Promise<T | null> {
+  const db = await connectDB();
+  const item = await db.collection(collection).findOne(filter as Record<string, unknown>);
+  return item as unknown as T | null;
 }
 
-export function insertOne<T extends { _id?: string }>(collection: string, doc: T): T & { _id: string } {
-  const items = readCollection<T>(collection);
-  const newDoc = { ...doc, _id: doc._id || generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as T & { _id: string };
-  items.push(newDoc);
-  writeCollection(collection, items);
-  return newDoc;
+export async function insertOne<T extends { _id?: string }>(collection: string, doc: T): Promise<T & { _id: string }> {
+  const db = await connectDB();
+  const newDoc = {
+    ...doc,
+    _id: (doc._id || generateId()) as any,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await db.collection(collection).insertOne(newDoc);
+  return newDoc as unknown as T & { _id: string };
 }
 
-export function updateOne<T extends { _id: string }>(collection: string, id: string, updates: Partial<T>): T | null {
-  const items = readCollection<T>(collection);
-  const index = items.findIndex((item: any) => item._id === id);
-  if (index === -1) return null;
-  items[index] = { ...items[index], ...updates, updatedAt: new Date().toISOString() } as T;
-  writeCollection(collection, items);
-  return items[index];
+export async function updateOne<T extends { _id: string }>(collection: string, id: string, updates: Partial<T>): Promise<T | null> {
+  const db = await connectDB();
+  const result = await db.collection(collection).findOneAndUpdate(
+    { _id: id as any },
+    { $set: { ...updates, updatedAt: new Date().toISOString() } },
+    { returnDocument: 'after' }
+  );
+  return result as unknown as T | null;
 }
 
-export function deleteOne<T extends { _id: string }>(collection: string, id: string): boolean {
-  const items = readCollection<T>(collection);
-  const filtered = items.filter((item: any) => item._id !== id);
-  if (filtered.length === items.length) return false;
-  writeCollection(collection, filtered);
-  return true;
+export async function deleteOne<T extends { _id: string }>(collection: string, id: string): Promise<boolean> {
+  const db = await connectDB();
+  const result = await db.collection(collection).deleteOne({ _id: id as any });
+  return result.deletedCount > 0;
 }
 
-export function deleteMany<T>(collection: string, filter: Partial<T>): number {
-  const items = readCollection<T>(collection);
-  const remaining = items.filter((item) => {
-    return !Object.entries(filter).every(([key, value]) => (item as any)[key] === value);
-  });
-  const deleted = items.length - remaining.length;
-  writeCollection(collection, remaining);
-  return deleted;
-}
-
-export function aggregate<T>(collection: string, userId: string, groupField?: string): Record<string, number> {
-  const items = readCollection<T>(collection).filter((item: any) => item.userId === userId);
-  const result: Record<string, number> = {};
-  if (groupField) {
-    items.forEach((item: any) => {
-      const key = String(item[groupField]);
-      result[key] = (result[key] || 0) + (item.duration || 0);
-    });
-  }
-  return result;
+export async function deleteMany<T>(collection: string, filter: Partial<T>): Promise<number> {
+  const db = await connectDB();
+  const result = await db.collection(collection).deleteMany(filter as Record<string, unknown>);
+  return result.deletedCount;
 }

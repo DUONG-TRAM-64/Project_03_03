@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const payload = getUserFromRequest(req);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const goals = findAll<GoalDoc>('goals')
+    const goals = (await findAll<GoalDoc>('goals'))
       .filter((g) => g.userId === payload.userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const { title, targetHours, reward } = await req.json();
     if (!title || !targetHours) return NextResponse.json({ error: 'Title and target hours are required' }, { status: 400 });
 
-    const goal = insertOne<GoalDoc>('goals', {
+    const goal = await insertOne<GoalDoc>('goals', {
       _id: generateId(),
       userId: payload.userId,
       title,
@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest) {
 
     const { id, completed, title, targetHours, reward } = await req.json();
 
-    const existing = findById<GoalDoc>('goals', id);
+    const existing = await findById<GoalDoc>('goals', id);
     if (!existing || existing.userId !== payload.userId) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
@@ -76,7 +76,7 @@ export async function PUT(req: NextRequest) {
       updates.completedAt = completed ? new Date().toISOString() : null;
     }
 
-    const goal = updateOne<GoalDoc>('goals', id, updates);
+    const goal = await updateOne<GoalDoc>('goals', id, updates);
     return NextResponse.json({ goal });
   } catch (error: any) {
     console.error('Update goal error:', error);
@@ -90,12 +90,12 @@ export async function DELETE(req: NextRequest) {
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await req.json();
-    const existing = findById<GoalDoc>('goals', id);
+    const existing = await findById<GoalDoc>('goals', id);
     if (!existing || existing.userId !== payload.userId) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
-    deleteOne('goals', id);
+    await deleteOne('goals', id);
     return NextResponse.json({ message: 'Goal deleted' });
   } catch (error: any) {
     console.error('Delete goal error:', error);

@@ -26,13 +26,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
     }
 
-    const existing = findOne<UserDoc>('users', { email: email.toLowerCase() });
+    const existing = await findOne<UserDoc>('users', { email: email.toLowerCase() });
     if (existing) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = insertOne<UserDoc>('users', {
+    const user = await insertOne<UserDoc>('users', {
       _id: generateId(),
       name,
       email: email.toLowerCase(),

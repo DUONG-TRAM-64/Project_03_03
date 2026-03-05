@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const payload = getUserFromRequest(req);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const favorites = findAll<FavoriteDoc>('favorites')
+    const favorites = (await findAll<FavoriteDoc>('favorites'))
       .filter((f) => f.userId === payload.userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const favorite = insertOne<FavoriteDoc>('favorites', {
+    const favorite = await insertOne<FavoriteDoc>('favorites', {
       _id: generateId(),
       userId: payload.userId,
       name: name.trim(),
@@ -88,7 +88,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    const existing = findById<FavoriteDoc>('favorites', id);
+    const existing = await findById<FavoriteDoc>('favorites', id);
     if (!existing || existing.userId !== payload.userId) {
       return NextResponse.json({ error: 'Favorite not found' }, { status: 404 });
     }
@@ -120,7 +120,7 @@ export async function PUT(req: NextRequest) {
       updates.lastVisited = new Date().toISOString();
     }
 
-    const updated = updateOne<FavoriteDoc>('favorites', id, updates);
+    const updated = await updateOne<FavoriteDoc>('favorites', id, updates);
 
     return NextResponse.json({ favorite: updated });
   } catch (error: any) {
@@ -140,12 +140,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    const existing = findById<FavoriteDoc>('favorites', id);
+    const existing = await findById<FavoriteDoc>('favorites', id);
     if (!existing || existing.userId !== payload.userId) {
       return NextResponse.json({ error: 'Favorite not found' }, { status: 404 });
     }
 
-    deleteOne('favorites', id);
+    await deleteOne('favorites', id);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = findById<UserDoc>('users', payload.userId);
+    const user = await findById<UserDoc>('users', payload.userId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest) {
     if (body.name) updates.name = body.name;
     if (body.dailyGoal) updates.dailyGoal = body.dailyGoal;
 
-    const user = updateOne<UserDoc>('users', payload.userId, updates as any);
+    const user = await updateOne<UserDoc>('users', payload.userId, updates as any);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

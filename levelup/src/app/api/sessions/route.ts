@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     const startDate = req.nextUrl.searchParams.get('startDate');
     const endDate = req.nextUrl.searchParams.get('endDate');
 
-    let sessions = findAll<SessionDoc>('sessions').filter((s) => s.userId === payload.userId);
+    let sessions = (await findAll<SessionDoc>('sessions')).filter((s) => s.userId === payload.userId);
 
     if (subjectId) sessions = sessions.filter((s) => s.subjectId === subjectId);
     if (startDate) sessions = sessions.filter((s) => new Date(s.date) >= new Date(startDate));
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     sessions = sessions.slice(0, limit);
 
-    const allSubjects = findAll<SubjectDoc>('subjects');
+    const allSubjects = await findAll<SubjectDoc>('subjects');
     const sessionsWithSubject = sessions.map((session) => {
       const subject = allSubjects.find((s) => s._id === session.subjectId);
       return {
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     if (!subjectId || !duration) return NextResponse.json({ error: 'Subject and duration are required' }, { status: 400 });
     if (duration < 1) return NextResponse.json({ error: 'Duration must be at least 1 minute' }, { status: 400 });
 
-    const session = insertOne<SessionDoc>('sessions', {
+    const session = await insertOne<SessionDoc>('sessions', {
       _id: generateId(),
       userId: payload.userId,
       subjectId,
@@ -83,13 +83,13 @@ export async function POST(req: NextRequest) {
     });
 
     // Update XP
-    const allSessions = findAll<SessionDoc>('sessions').filter((s) => s.userId === payload.userId);
+    const allSessions = (await findAll<SessionDoc>('sessions')).filter((s) => s.userId === payload.userId);
     const totalMinutes = allSessions.reduce((sum, s) => sum + s.duration, 0);
     const totalXP = calculateXP(totalMinutes);
     const level = calculateLevel(totalXP);
-    updateOne<UserDoc>('users', payload.userId, { xp: totalXP, level } as any);
+    await updateOne<UserDoc>('users', payload.userId, { xp: totalXP, level } as any);
 
-    const subject = findById<SubjectDoc>('subjects', subjectId);
+    const subject = await findById<SubjectDoc>('subjects', subjectId);
     const populated = {
       ...session,
       subjectId: subject ? { _id: subject._id, name: subject.name, icon: subject.icon, color: subject.color } : null,
@@ -108,18 +108,18 @@ export async function DELETE(req: NextRequest) {
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await req.json();
-    const session = findById<SessionDoc>('sessions', id);
+    const session = await findById<SessionDoc>('sessions', id);
     if (!session || session.userId !== payload.userId) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    deleteOne('sessions', id);
+    await deleteOne('sessions', id);
 
-    const allSessions = findAll<SessionDoc>('sessions').filter((s) => s.userId === payload.userId);
+    const allSessions = (await findAll<SessionDoc>('sessions')).filter((s) => s.userId === payload.userId);
     const totalMinutes = allSessions.reduce((sum, s) => sum + s.duration, 0);
     const totalXP = calculateXP(totalMinutes);
     const level = calculateLevel(totalXP);
-    updateOne<UserDoc>('users', payload.userId, { xp: totalXP, level } as any);
+    await updateOne<UserDoc>('users', payload.userId, { xp: totalXP, level } as any);
 
     return NextResponse.json({ message: 'Session deleted', xp: totalXP, level });
   } catch (error: any) {
